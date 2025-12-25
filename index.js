@@ -270,6 +270,33 @@ async function run() {
       const result = await fundingCollection.insertOne(req.body);
       res.send(result);
     });
+    const axios = require("axios");
+
+app.post("/upload-image", verifyToken, async (req, res) => {
+  try {
+    const { image } = req.body;
+
+    if (!image) {
+      return res.status(400).send({ message: "image is required" });
+    }
+
+    const response = await axios.post(
+      `https://api.imgbb.com/1/upload?key=${process.env.IMGBB_API_KEY}`,
+      { image }
+    );
+
+    res.send({
+      success: true,
+      imageUrl: response.data.data.url,
+    });
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: "Image upload failed",
+    });
+  }
+});
+
 
     /* ======================
        ADMIN STATS
