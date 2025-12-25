@@ -19,7 +19,7 @@ app.use(express.json());
 /* ======================
    MongoDB URI
 ====================== */
-const uri = "mongodb+srv://db-user-2:OMdJezD1Urj63Vl9@cluster0.ljx7nxk.mongodb.net/?appName=Cluster0";
+const uri = process.env.MONGODB_URI;
 
 const client = new MongoClient(uri, {
   serverApi: {
@@ -285,7 +285,7 @@ async function run() {
       res.send({ users, requests, totalFunds });
     });
 
-    console.log("✅ MongoDB connected");
+    console.log(" MongoDB connected");
   } finally {
   }
 }
@@ -295,9 +295,9 @@ run();
    Root
 ====================== */
 app.get("/", (req, res) => {
-  res.send("🚀 Blood Donation Server is running");
+  res.send(" Blood Donation Server is running");
 });
 
 app.listen(port, () => {
-  console.log(`🚀 Server running on port ${port}`);
+  console.log(` Server running on port ${port}`);
 });
