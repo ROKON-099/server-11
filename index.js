@@ -1,0 +1,1 @@
+const uri = "mongodb+srv://db-user-2:OMdJezD1Urj63Vl9@cluster0.ljx7nxk.mongodb.net/?appName=Cluster0";
