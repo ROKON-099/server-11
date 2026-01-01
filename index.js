@@ -1,11 +1,10 @@
-
-
 const express = require("express");
 const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const jwt = require("jsonwebtoken");
+const axios = require("axios");
+const stripe = process.env.STRIPE_SECRET_KEY ? require("stripe")(process.env.STRIPE_SECRET_KEY) : null;
 require("dotenv").config();
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -49,6 +48,8 @@ const verifyToken = (req, res, next) => {
 /* ======================
    Role Middleware
 ====================== */
+let userCollection;
+
 const verifyAdmin = async (req, res, next) => {
   const email = req.decoded.email;
   const user = await userCollection.findOne({ email });
@@ -70,7 +71,6 @@ const verifyVolunteer = async (req, res, next) => {
 /* ======================
    Main Function
 ====================== */
-let userCollection;
 let donationCollection;
 let fundingCollection;
 
@@ -98,7 +98,6 @@ async function run() {
        USERS API
     ====================== */
 
-    // Register User
     app.post("/users", async (req, res) => {
       const user = req.body;
       const exists = await userCollection.findOne({ email: user.email });
@@ -111,7 +110,6 @@ async function run() {
       res.send(result);
     });
 
-    // Get all users (Admin)
     app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
       const status = req.query.status;
       const query = status ? { status } : {};
@@ -119,7 +117,6 @@ async function run() {
       res.send(result);
     });
 
-    // Get single user
     app.get("/users/:email", verifyToken, async (req, res) => {
       if (req.params.email !== req.decoded.email) {
         return res.status(403).send({ message: "forbidden" });
@@ -130,7 +127,6 @@ async function run() {
       res.send(user);
     });
 
-    // Update profile
     app.patch("/users/:email", verifyToken, async (req, res) => {
       const update = {
         $set: {
@@ -148,7 +144,6 @@ async function run() {
       res.send(result);
     });
 
-    // Make Admin
     app.patch("/users/admin/:id", verifyToken, verifyAdmin, async (req, res) => {
       const result = await userCollection.updateOne(
         { _id: new ObjectId(req.params.id) },
@@ -157,7 +152,6 @@ async function run() {
       res.send(result);
     });
 
-    // Make Volunteer
     app.patch(
       "/users/volunteer/:id",
       verifyToken,
@@ -171,7 +165,6 @@ async function run() {
       }
     );
 
-    // Block / Unblock
     app.patch(
       "/users/status/:id",
       verifyToken,
@@ -189,7 +182,6 @@ async function run() {
        DONATION REQUEST API
     ====================== */
 
-    // Create request
     app.post("/donation-requests", verifyToken, async (req, res) => {
       const user = await userCollection.findOne({
         email: req.body.requesterEmail,
@@ -202,7 +194,6 @@ async function run() {
       res.send(result);
     });
 
-    // Public pending requests
     app.get("/donation-requests/public", async (req, res) => {
       const result = await donationCollection
         .find({ donationStatus: "pending" })
@@ -210,7 +201,6 @@ async function run() {
       res.send(result);
     });
 
-    // My requests
     app.get("/donation-requests", verifyToken, async (req, res) => {
       if (req.query.email !== req.decoded.email) {
         return res.status(403).send({ message: "forbidden" });
@@ -221,7 +211,6 @@ async function run() {
       res.send(result);
     });
 
-    // All requests (Admin / Volunteer)
     app.get(
       "/donation-requests/all",
       verifyToken,
@@ -234,17 +223,14 @@ async function run() {
       }
     );
 
-    // Update status
     app.patch("/donation-requests/:id", verifyToken, async (req, res) => {
-      const update = { $set: req.body };
       const result = await donationCollection.updateOne(
         { _id: new ObjectId(req.params.id) },
-        update
+        { $set: req.body }
       );
       res.send(result);
     });
 
-    // Delete
     app.delete("/donation-requests/:id", verifyToken, async (req, res) => {
       const result = await donationCollection.deleteOne({
         _id: new ObjectId(req.params.id),
@@ -253,10 +239,13 @@ async function run() {
     });
 
     /* ======================
-       FUNDING / STRIPE
+       STRIPE / FUNDING
     ====================== */
 
     app.post("/create-payment-intent", verifyToken, async (req, res) => {
+      if (!stripe) {
+        return res.status(500).send({ message: "Stripe not configured" });
+      }
       const amount = parseInt(req.body.amount * 100);
       const paymentIntent = await stripe.paymentIntents.create({
         amount,
@@ -270,61 +259,63 @@ async function run() {
       const result = await fundingCollection.insertOne(req.body);
       res.send(result);
     });
-    const axios = require("axios");
 
-app.post("/upload-image", verifyToken, async (req, res) => {
-  try {
-    const { image } = req.body;
+    /* ======================
+       IMAGE UPLOAD (ImgBB)
+    ====================== */
 
-    if (!image) {
-      return res.status(400).send({ message: "image is required" });
-    }
+    app.post("/upload-image", verifyToken, async (req, res) => {
+      try {
+        const { image } = req.body;
 
-    const response = await axios.post(
-      `https://api.imgbb.com/1/upload?key=${process.env.IMGBB_API_KEY}`,
-      { image }
-    );
+        if (!image) {
+          return res.status(400).send({ message: "image is required" });
+        }
 
-    res.send({
-      success: true,
-      imageUrl: response.data.data.url,
+        const response = await axios.post(
+          `https://api.imgbb.com/1/upload?key=${process.env.IMGBB_API_KEY}`,
+          { image }
+        );
+
+        res.send({
+          success: true,
+          imageUrl: response.data.data.url,
+        });
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: "Image upload failed",
+        });
+      }
     });
-  } catch (error) {
-    res.status(500).send({
-      success: false,
-      message: "Image upload failed",
-    });
-  }
-});
-
 
     /* ======================
        ADMIN STATS
     ====================== */
+
     app.get("/admin-stats", verifyToken, verifyAdmin, async (req, res) => {
       const users = await userCollection.countDocuments();
       const requests = await donationCollection.countDocuments();
       const funds = await fundingCollection.find().toArray();
-      const totalFunds = funds.reduce(
-        (sum, item) => sum + item.amount,
-        0
-      );
+      const totalFunds = funds.reduce((sum, item) => sum + item.amount, 0);
       res.send({ users, requests, totalFunds });
     });
 
     console.log(" MongoDB connected");
-  } finally {
+  } catch (error) {
+    console.error(error);
   }
 }
+
 run();
 
 /* ======================
    Root
 ====================== */
 app.get("/", (req, res) => {
-  res.send(" Blood Donation Server is running");
+  res.send("Blood Donation Server is running");
 });
 
 app.listen(port, () => {
-  console.log(` Server running on port ${port}`);
+  console.log(`🚀 Server running on port ${port}`);
 });
