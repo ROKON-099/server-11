@@ -73,6 +73,14 @@ const verifyVolunteer = async (req, res, next) => {
   }
   next();
 };
+app.get("/users/volunteer/:email", verifyToken, async (req, res) => {
+  if (req.params.email !== req.decoded.email) {
+    return res.status(403).send({ message: "forbidden" });
+  }
+
+  const user = await userCollection.findOne({ email: req.params.email });
+  res.send({ volunteer: user?.role === "volunteer" || user?.role === "admin" });
+});
 
 /* ======================
    Main
