@@ -18,11 +18,7 @@ const port = process.env.PORT || 5000;
 ====================== */
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:3000",
-      
-    ],
+    origin: ["http://localhost:5173", "http://localhost:3000"],
     credentials: true,
   })
 );
@@ -73,14 +69,6 @@ const verifyVolunteer = async (req, res, next) => {
   }
   next();
 };
-app.get("/users/volunteer/:email", verifyToken, async (req, res) => {
-  if (req.params.email !== req.decoded.email) {
-    return res.status(403).send({ message: "forbidden" });
-  }
-
-  const user = await userCollection.findOne({ email: req.params.email });
-  res.send({ volunteer: user?.role === "volunteer" || user?.role === "admin" });
-});
 
 /* ======================
    Main
@@ -215,48 +203,32 @@ async function run() {
     });
 
     app.get("/donation-requests/public", async (req, res) => {
-      res.send(
-        await donationCollection.find({ donationStatus: "pending" }).toArray()
-      );
+      res.send(await donationCollection.find({ donationStatus: "pending" }).toArray());
     });
 
     app.get("/donation-requests", verifyToken, async (req, res) => {
       if (req.query.email !== req.decoded.email) {
         return res.status(403).send({ message: "forbidden" });
       }
-      res.send(
-        await donationCollection
-          .find({ requesterEmail: req.query.email })
-          .toArray()
-      );
+      res.send(await donationCollection.find({ requesterEmail: req.query.email }).toArray());
     });
 
-    app.get(
-      "/donation-requests/all",
-      verifyToken,
-      verifyVolunteer,
-      async (req, res) => {
-        const query = req.query.status
-          ? { donationStatus: req.query.status }
-          : {};
-        res.send(await donationCollection.find(query).toArray());
-      }
-    );
+    app.get("/donation-requests/all", verifyToken, verifyVolunteer, async (req, res) => {
+      const query = req.query.status ? { donationStatus: req.query.status } : {};
+      res.send(await donationCollection.find(query).toArray());
+    });
 
     app.patch("/donation-requests/:id", verifyToken, async (req, res) => {
       const user = await userCollection.findOne({ email: req.decoded.email });
-      const donation = await donationCollection.findOne({
-        _id: new ObjectId(req.params.id),
-      });
+      const donation = await donationCollection.findOne({ _id: new ObjectId(req.params.id) });
+
+      if (!donation) return res.status(404).send({ message: "not found" });
 
       if (user.role === "donor" && donation.requesterEmail !== user.email) {
         return res.status(403).send({ message: "forbidden" });
       }
 
-      if (
-        user.role === "volunteer" &&
-        Object.keys(req.body).length !== 1
-      ) {
+      if (user.role === "volunteer" && Object.keys(req.body).length !== 1) {
         return res.status(403).send({ message: "restricted" });
       }
 
@@ -272,19 +244,14 @@ async function run() {
         return res.status(400).send({ message: "invalid status flow" });
       }
 
-      res.send(
-        await donationCollection.updateOne(
-          { _id: donation._id },
-          { $set: req.body }
-        )
-      );
+      res.send(await donationCollection.updateOne({ _id: donation._id }, { $set: req.body }));
     });
 
     app.delete("/donation-requests/:id", verifyToken, async (req, res) => {
       const user = await userCollection.findOne({ email: req.decoded.email });
-      const donation = await donationCollection.findOne({
-        _id: new ObjectId(req.params.id),
-      });
+      const donation = await donationCollection.findOne({ _id: new ObjectId(req.params.id) });
+
+      if (!donation) return res.status(404).send({ message: "not found" });
 
       if (user.role !== "admin" && donation.requesterEmail !== user.email) {
         return res.status(403).send({ message: "forbidden" });
@@ -297,11 +264,11 @@ async function run() {
        STRIPE & FUNDING
     ====================== */
     app.post("/create-payment-intent", verifyToken, async (req, res) => {
-      if (!stripe) {
-        return res.status(500).send({ message: "Stripe not configured" });
-      }
+      if (!stripe) return res.status(500).send({ message: "Stripe not configured" });
 
-      const amount = Math.round(req.body.amount * 100);
+      // 🔥 FIXED: frontend already sends cents
+      const amount = Math.round(req.body.amount);
+
       const intent = await stripe.paymentIntents.create({
         amount,
         currency: "usd",
@@ -313,22 +280,6 @@ async function run() {
 
     app.post("/fundings", verifyToken, async (req, res) => {
       res.send(await fundingCollection.insertOne(req.body));
-    });
-
-    /* ======================
-       IMAGE UPLOAD
-    ====================== */
-    app.post("/upload-image", verifyToken, async (req, res) => {
-      const formData = new FormData();
-      formData.append("image", req.body.image);
-
-      const response = await axios.post(
-        `https://api.imgbb.com/1/upload?key=${process.env.IMGBB_API_KEY}`,
-        formData,
-        { headers: formData.getHeaders() }
-      );
-
-      res.send({ imageUrl: response.data.data.url });
     });
 
     /* ======================
