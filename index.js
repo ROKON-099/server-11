@@ -14,18 +14,19 @@ const port = process.env.PORT || 5000;
 /* ======================
    Middleware
 ====================== */
+app.use(express.json()); // ✅ FIX 1: REQUIRED
+
 app.use(
   cors({
     origin: [
       "http://localhost:5173",
       "http://localhost:5174",
       "https://client-11-s787.vercel.app",
-      "https://client-11-hlov.vercel.app"
+      "https://client-11-hlov.vercel.app",
     ],
     credentials: true,
   })
 );
-
 
 /* ======================
    MongoDB
@@ -76,19 +77,32 @@ async function run() {
     fundingCollection = db.collection("fundings");
 
     /* ======================
-       JWT (FIXED)
+       JWT (SAFE)
     ====================== */
     app.post("/jwt", async (req, res) => {
-      const user = await userCollection.findOne({ email: req.body.email });
-      if (!user) return res.status(404).send({ message: "User not found" });
+      try {
+        const { email } = req.body;
 
-      const token = jwt.sign(
-        { email: user.email, role: user.role },
-        process.env.JWT_SECRET,
-        { expiresIn: "7d" }
-      );
+        if (!email) {
+          return res.status(400).send({ message: "Email is required" });
+        }
 
-      res.send({ token });
+        const user = await userCollection.findOne({ email });
+        if (!user) {
+          return res.status(404).send({ message: "User not found" });
+        }
+
+        const token = jwt.sign(
+          { email: user.email, role: user.role },
+          process.env.JWT_SECRET,
+          { expiresIn: "7d" }
+        );
+
+        res.send({ token });
+      } catch (error) {
+        console.error("JWT ERROR:", error);
+        res.status(500).send({ message: "JWT generation failed" });
+      }
     });
 
     /* ======================
@@ -164,7 +178,7 @@ async function run() {
     });
 
     /* ======================
-       DONATION REQUESTS (FIXED ORDER)
+       DONATION REQUESTS
     ====================== */
     app.post("/donation-requests", verifyToken, async (req, res) => {
       const user = await userCollection.findOne({ email: req.user.email });
@@ -197,7 +211,6 @@ async function run() {
       );
     });
 
-    // ✅ ALL FIRST
     app.get(
       "/donation-requests/all",
       verifyToken,
@@ -210,7 +223,6 @@ async function run() {
       }
     );
 
-    // ✅ THEN :id
     app.get("/donation-requests/:id", verifyToken, async (req, res) => {
       try {
         const donation = await donationCollection.findOne({
