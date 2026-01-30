@@ -19,7 +19,7 @@ app.use(
     origin: [
       "http://localhost:5173",
       "http://localhost:5174",
-      "https://client-11-eujf.vercel.app",
+      "https://client-11-s787.vercel.app",
       "https://client-11-hlov.vercel.app"
     ],
     credentials: true,
