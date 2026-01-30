@@ -71,14 +71,18 @@ async function run() {
     fundingCollection = db.collection("fundings");
 
     /* ======================
-       JWT
+       JWT (FIXED)
     ====================== */
     app.post("/jwt", async (req, res) => {
+      const user = await userCollection.findOne({ email: req.body.email });
+      if (!user) return res.status(404).send({ message: "User not found" });
+
       const token = jwt.sign(
-        { email: req.body.email },
+        { email: user.email, role: user.role },
         process.env.JWT_SECRET,
         { expiresIn: "7d" }
       );
+
       res.send({ token });
     });
 
@@ -155,7 +159,7 @@ async function run() {
     });
 
     /* ======================
-       DONATION REQUESTS
+       DONATION REQUESTS (FIXED ORDER)
     ====================== */
     app.post("/donation-requests", verifyToken, async (req, res) => {
       const user = await userCollection.findOne({ email: req.user.email });
@@ -188,23 +192,7 @@ async function run() {
       );
     });
 
-    /* ✅ FIXED ROUTE (ONLY ADDITION) */
-    app.get("/donation-requests/:id", verifyToken, async (req, res) => {
-      try {
-        const donation = await donationCollection.findOne({
-          _id: new ObjectId(req.params.id),
-        });
-
-        if (!donation) {
-          return res.status(404).send({ message: "Donation not found" });
-        }
-
-        res.send(donation);
-      } catch (error) {
-        res.status(400).send({ message: "Invalid donation ID" });
-      }
-    });
-
+    // ✅ ALL FIRST
     app.get(
       "/donation-requests/all",
       verifyToken,
@@ -216,6 +204,23 @@ async function run() {
         res.send(await donationCollection.find(query).toArray());
       }
     );
+
+    // ✅ THEN :id
+    app.get("/donation-requests/:id", verifyToken, async (req, res) => {
+      try {
+        const donation = await donationCollection.findOne({
+          _id: new ObjectId(req.params.id),
+        });
+
+        if (!donation) {
+          return res.status(404).send({ message: "Donation not found" });
+        }
+
+        res.send(donation);
+      } catch {
+        res.status(400).send({ message: "Invalid donation ID" });
+      }
+    });
 
     app.patch("/donation-requests/:id", verifyToken, async (req, res) => {
       const user = await userCollection.findOne({ email: req.user.email });
@@ -295,7 +300,7 @@ async function run() {
     /* ======================
        ADMIN STATS
     ====================== */
-    app.get("/admin-stats", verifyToken, verifyAdmin, async (req, res) => {
+    app.get("/admin-stats", verifyToken, verifyVolunteer, async (req, res) => {
       const users = await userCollection.countDocuments({ role: "donor" });
       const requests = await donationCollection.countDocuments();
       const fundAgg = await fundingCollection
@@ -319,4 +324,3 @@ run();
 
 app.get("/", (req, res) => res.send("Blood Donation Server Running"));
 app.listen(port, () => console.log(`Server running on port ${port}`));
-
