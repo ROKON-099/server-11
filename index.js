@@ -18,15 +18,11 @@ app.use(express.json()); // ✅ FIX 1: REQUIRED
 
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:5174",
-      "https://client-11-s787.vercel.app",
-      "https://client-11-hlov.vercel.app",
-    ],
+    origin: true,   // ✅ allow all origins
     credentials: true,
   })
 );
+
 
 /* ======================
    MongoDB
