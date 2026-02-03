@@ -109,17 +109,23 @@ async function run() {
        USERS
     ====================== */
     app.post("/users", async (req, res) => {
-      const user = req.body;
-      const exists = await userCollection.findOne({ email: user.email });
-      if (exists) return res.send({ message: "User exists" });
+  const user = req.body;
 
-      const result = await userCollection.insertOne({
-        ...user,
-        role: "donor",
-        status: "active",
-      });
-      res.send(result);
-    });
+  const email = user.email.toLowerCase(); // 🔥 FIX
+
+  const exists = await userCollection.findOne({ email });
+  if (exists) return res.send({ message: "User exists" });
+
+  const result = await userCollection.insertOne({
+    ...user,
+    email, // 🔥 lowercase email
+    role: "donor",
+    status: "active",
+  });
+
+  res.send(result);
+});
+
 
     app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
       const query =
