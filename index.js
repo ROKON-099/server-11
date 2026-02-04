@@ -83,10 +83,27 @@ async function run() {
           return res.status(400).send({ message: "Email is required" });
         }
 
-        const user = await userCollection.findOne({ email });
-        if (!user) {
-          return res.status(404).send({ message: "User not found" });
-        }
+       app.post("/jwt", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).send({ message: "Email is required" });
+    }
+
+    const token = jwt.sign(
+      { email }, 
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.send({ token });
+  } catch (error) {
+    console.error("JWT ERROR:", error);
+    res.status(500).send({ message: "JWT generation failed" });
+  }
+});
+
 
         const token = jwt.sign(
           { email: user.email, role: user.role },
