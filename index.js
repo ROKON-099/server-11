@@ -76,14 +76,6 @@ async function run() {
        JWT (SAFE)
     ====================== */
     app.post("/jwt", async (req, res) => {
-      try {
-        const { email } = req.body;
-
-        if (!email) {
-          return res.status(400).send({ message: "Email is required" });
-        }
-
-       app.post("/jwt", async (req, res) => {
   try {
     const { email } = req.body;
 
@@ -104,19 +96,6 @@ async function run() {
   }
 });
 
-
-        const token = jwt.sign(
-          { email: user.email, role: user.role },
-          process.env.JWT_SECRET,
-          { expiresIn: "7d" }
-        );
-
-        res.send({ token });
-      } catch (error) {
-        console.error("JWT ERROR:", error);
-        res.status(500).send({ message: "JWT generation failed" });
-      }
-    });
 
     /* ======================
        USERS
